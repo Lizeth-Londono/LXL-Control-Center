@@ -1,5 +1,7 @@
 # ZIP operativo v3.2
 
+Validación final, correcciones del motor y pendiente de ZIP real superior a 15 MB: [VALIDACION-ZIP-v3.2.md](VALIDACION-ZIP-v3.2.md).
+
 Se sirve con el mismo servidor estático del sitio, por HTTP/HTTPS. No funciona desde `file://`. Requiere Worker, Blob, TextDecoder y un navegador moderno. La biblioteca fflate 0.8.2 está incluida localmente con licencia MIT; no se usa CDN. Fuente: https://github.com/101arrowz/fflate/tree/v0.8.2
 
 ## Presupuestos reales

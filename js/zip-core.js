@@ -30,6 +30,7 @@
       const parts = name.replace(/\/$/, '').split('/');
       if (!name || name.length > 512 || /[\\:\x00-\x1f\x7f]/.test(name) || parts.some(x => !x || x === '..' || x === '.') || parts.length > cap.depth || names.has(name.toLowerCase())) fail('Ruta insegura, duplicada o demasiado profunda en el ZIP.');
       if (((u32(p + 38) >>> 16) & 0xf000) === 0xa000) fail('No se admiten enlaces simbólicos.');
+      if (name.endsWith('/') && (size !== 0 || u32(p + 16) !== 0)) fail('Entrada de carpeta anómala: contiene datos o un CRC no vacío.');
       names.add(name.toLowerCase()); total += size;
       if (size > cap.entry || total > cap.expanded || size / Math.max(1, packed) > cap.ratio) fail('Expansión excesiva: posible ZIP bomb o archivo demasiado grande.');
       if (local + 30 > start || u32(local) !== 0x04034b50 || u16(local + 6) !== flags || u16(local + 8) !== method) fail('Cabecera local incoherente.');
@@ -53,13 +54,12 @@
     for (let i=0;i<entries.length;i++) {
       if (Date.now()-begun > cap.seconds*1000) fail('Se alcanzó el tiempo máximo. Divide el proyecto.');
       const e = entries[i], ext = e.name.split('.').pop().toLowerCase();
-      if (e.directory) continue;
       const kind = /^(html?|css|[cm]?jsx?|tsx?)$/.test(ext);
       if (/^html?$/.test(ext)) report.counts.html++;
       else if (ext === 'css') report.counts.css++;
       else if (/^([cm]?jsx?|tsx?)$/.test(ext)) report.counts.javascript++;
       else if (/^(png|jpg|jpeg|webp|gif|svg|avif|ico)$/.test(ext)) report.counts.images++;
-      else report.counts.resources++;
+      else if (!e.directory) report.counts.resources++;
       let actual = 0, crc = 0xffffffff, text = '', decoder = new TextDecoder();
       const scan = kind || /(^|\/)package\.json$/.test(e.name);
       const accept = chunk => {
