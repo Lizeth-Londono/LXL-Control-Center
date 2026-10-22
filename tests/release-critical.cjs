@@ -6,7 +6,8 @@ if(!process.argv[2])throw new Error('Provide an authorized local ZIP; it is neve
 for(const [script,args] of [
  ['zip-browser.cjs',[]],
  ['zip-final.cjs',[process.argv[2],process.argv[3]||'289']],
- ['commercial-browser.cjs',[process.argv[2]]]
+ ['commercial-browser.cjs',[process.argv[2]]],
+ ['commercial-automation-browser.cjs',[]]
 ]){
  console.log('START',script,new Date().toISOString());
  const result=spawnSync(process.execPath,[path.join(__dirname,script),...args],{stdio:'inherit'});
