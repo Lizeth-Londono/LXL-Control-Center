@@ -20,7 +20,7 @@ test('deflated data and empty ZIP accepted',async()=>{
   await z.analyze(zip({'index.html':'<html><form></form></html>'},6),cap,f);assert.equal((await z.analyze(zip({}),cap,f)).structure.length,0);
 });
 test('corrupt, traversal, duplicate, deep and bomb archives rejected',async()=>{
-  const cases=[new Uint8Array(10), zip({'../evil.js':'x'}),zip({'/absolute':'x'}),zip({'a\\evil':'x'}),zip({'a:evil':'x'}),zip({'a/./b':'x'}),zip({'A.js':'x','a.js':'x'}),zip({['a/'.repeat(25)+'x']:'x'}),zip({'bomb.txt':new Uint8Array(1048576)},9)];
+  const cases=[new Uint8Array(10), zip({'../evil.js':'x'}),zip({'/absolute':'x'}),zip({'a\\evil':'x'}),zip({'a:evil':'x'}),zip({'a/./b':'x'}),zip({'A.js':'x','a.js':'x'}),zip({['a/'.repeat(25)+'x']:'x'}),zip({'bomb.txt':new Uint8Array(cap.entry+1)},9)];
   for(const b of cases)await assert.rejects(z.analyze(b,cap,f));
 });
 test('compressed, expanded, per-file, entry count and deadline limits',async()=>{
@@ -34,4 +34,24 @@ test('CRC corruption, unsupported methods, encrypted and ZIP64 archives',async()
 test('real expansion cannot exceed false declared sizes',async()=>{
   const b=zip({'a.js':'hello world '.repeat(2000)},6),v=new DataView(b.buffer);const end=b.length-22,central=v.getUint32(end+16,true);v.setUint32(22,1,true);v.setUint32(central+24,1,true);
   await assert.rejects(z.analyze(b,cap,f),/expansión real/);
+});
+test('bounded high compression warns without rejecting a valid file',async()=>{
+  const bytes=zip({'repeated.css':new Uint8Array(1048576)},9);
+  assert(1048576/bytes.length>cap.ratio);
+  const r=await z.analyze(bytes,cap,f);assert.equal(r.expandedBytes,1048576);assert(r.warnings.some(w=>w.includes('Compresión elevada')));assert.equal(r.version,'3.2.1');
+});
+test('diagnostics distinguish entry, aggregate, compressed and count limits without paths',async()=>{
+  const b=zip({'private-name.js':'hello','second.js':'world'});
+  for(const [override,label,detected,limit] of [[{entry:4},'individual',5,4],[{expanded:9},'total declarado',10,9],[{compressed:1},'comprimido',b.length,1],[{entries:1},'Número de entradas',2,1]]) {
+    await assert.rejects(z.analyze(b,{...cap,...override},f),e=>e.message.includes(label)&&e.message.includes(String(detected))&&e.message.includes(String(limit))&&!e.message.includes('private-name'));
+  }
+});
+test('aggregate bomb rejected even with individually bounded high-ratio files',async()=>{
+  const bytes=zip({'a.bin':new Uint8Array(2*1048576),'b.bin':new Uint8Array(2*1048576)},9);
+  await assert.rejects(z.analyze(bytes,{...cap,entry:3*1048576,expanded:3*1048576},f),/total declarado/);
+});
+test('more than 8 MiB per file supported within budget',async()=>{
+  const size=10*1048576,bytes=zip({'asset.bin':new Uint8Array(size)},9);
+  assert.equal((await z.analyze(bytes,cap,f)).expandedBytes,size);
+  await assert.rejects(z.analyze(bytes,{...cap,entry:8*1048576},f),/individual.*10485760.*8388608/);
 });

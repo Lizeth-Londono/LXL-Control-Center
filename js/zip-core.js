@@ -4,20 +4,28 @@
   const MiB = 1048576;
   function limits(memory = 0) {
     const budget = memory > 0 ? Math.min(256, memory * 32) : 64;
-    return { compressed: budget * MiB, expanded: budget * 2 * MiB, entry: 8 * MiB,
+    return { compressed: budget * MiB, expanded: budget * 2 * MiB, entry: Math.min(32, budget / 2) * MiB,
       entries: 5000, seconds: 30, ratio: 200, depth: 24, text: 2 * MiB };
   }
   function fail(message) { throw new Error(message); }
+  function checkLimit(kind, value, maximum, unit = 'bytes') {
+    if (value <= maximum) return;
+    const amount = n => unit === 'bytes' ? `${n} bytes (${(n / MiB).toFixed(2)} MiB)` : `${n} ${unit}`;
+    const error = new Error(`${kind}: detectado ${amount(value)}; límite aplicado ${amount(maximum)}. Reduce el proyecto o ajusta los límites dentro del presupuesto disponible.`);
+    error.code = kind;
+    throw error;
+  }
   function inspectDirectory(bytes, cap) {
     const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), n = bytes.length;
     const u16 = p => v.getUint16(p, true), u32 = p => v.getUint32(p, true);
-    if (n > cap.compressed) fail('El ZIP supera el límite comprimido. Divide el proyecto.');
+    checkLimit('Tamaño comprimido del ZIP', n, cap.compressed);
     let end = n - 22;
     for (; end >= Math.max(0, n - 65557); end--) if (u32(end) === 0x06054b50 && end + 22 + u16(end + 20) === n) break;
     if (end < Math.max(0, n - 65557)) fail('ZIP corrupto: no hay directorio final válido.');
     const count = u16(end + 10), start = u32(end + 16), length = u32(end + 12);
     if (u16(end + 4) || u16(end + 6) || count !== u16(end + 8) || count === 65535 || start === 0xffffffff) fail('ZIP64 o ZIP dividido no soportado.');
-    if (count > cap.entries || start + length !== end) fail('Directorio excesivo o estructura ZIP anómala.');
+    checkLimit('Número de entradas', count, cap.entries, 'entradas');
+    if (start + length !== end) fail('Estructura ZIP anómala: directorio incoherente.');
     const entries = [], names = new Set(); let p = start, total = 0, lastEnd = 0;
     for (let i = 0; i < count; i++) {
       if (p + 46 > end || u32(p) !== 0x02014b50) fail('Directorio ZIP corrupto.');
@@ -32,7 +40,8 @@
       if (((u32(p + 38) >>> 16) & 0xf000) === 0xa000) fail('No se admiten enlaces simbólicos.');
       if (name.endsWith('/') && (size !== 0 || u32(p + 16) !== 0)) fail('Entrada de carpeta anómala: contiene datos o un CRC no vacío.');
       names.add(name.toLowerCase()); total += size;
-      if (size > cap.entry || total > cap.expanded || size / Math.max(1, packed) > cap.ratio) fail('Expansión excesiva: posible ZIP bomb o archivo demasiado grande.');
+      checkLimit('Tamaño descomprimido individual', size, cap.entry);
+      checkLimit('Tamaño descomprimido total declarado', total, cap.expanded);
       if (local + 30 > start || u32(local) !== 0x04034b50 || u16(local + 6) !== flags || u16(local + 8) !== method) fail('Cabecera local incoherente.');
       const lnl = u16(local + 26), data = local + 30 + lnl + u16(local + 28);
       if (lnl !== nl || raw.some((b, j) => b !== bytes[local + 30 + j]) || data + packed > start) fail('Ruta o tamaño local incoherente.');
@@ -46,13 +55,17 @@
   const crcTable = Uint32Array.from({ length: 256 }, (_, n) => { for (let k=0;k<8;k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
   async function analyze(bytes, cap, flate, progress = () => {}) {
     const begun = Date.now(), { entries, total } = inspectDirectory(bytes, cap);
-    const report = { version: '3.2', limits: cap, compressedBytes: bytes.length, expandedBytes: total,
+    const report = { version: '3.2.1', limits: cap, compressedBytes: bytes.length, expandedBytes: total,
       structure: entries.map(e => ({ path: e.name, bytes: e.size, directory: e.directory })), counts: { html: 0, css: 0, javascript: 0, images: 0, resources: 0, forms: 0 }, findings: [], warnings: [], modules: [] };
     const finding = (technology, path, evidence, confidence = 'comprobado') => {
       if (report.findings.length < 500) report.findings.push({ technology, path, evidence, confidence });
     };
+    const highRatio = entries.filter(e => !e.directory && e.size / Math.max(1, e.packed) > cap.ratio);
+    if (highRatio.length) report.warnings.push(`Compresión elevada en ${highRatio.length} entradas: supera el umbral de advertencia ${cap.ratio}:1. No demuestra una ZIP bomb; se mantienen los límites de tamaño declarado y real, tiempo y entradas.`);
+    let actualTotal = 0;
+    const checkTime = () => checkLimit('Tiempo máximo de análisis', Date.now()-begun, cap.seconds*1000, 'ms');
     for (let i=0;i<entries.length;i++) {
-      if (Date.now()-begun > cap.seconds*1000) fail('Se alcanzó el tiempo máximo. Divide el proyecto.');
+      checkTime();
       const e = entries[i], ext = e.name.split('.').pop().toLowerCase();
       const kind = /^(html?|css|[cm]?jsx?|tsx?)$/.test(ext);
       if (/^html?$/.test(ext)) report.counts.html++;
@@ -63,8 +76,11 @@
       let actual = 0, crc = 0xffffffff, text = '', decoder = new TextDecoder();
       const scan = kind || /(^|\/)package\.json$/.test(e.name);
       const accept = chunk => {
-        actual += chunk.length;
-        if (actual > e.size || actual > cap.entry) fail('La expansión real excede el tamaño permitido.');
+        checkTime();
+        actual += chunk.length; actualTotal += chunk.length;
+        checkLimit('Tamaño descomprimido individual real', actual, cap.entry);
+        checkLimit('Tamaño descomprimido total real', actualTotal, cap.expanded);
+        if (actual > e.size) fail(`La expansión real excede el tamaño declarado: detectado ${actual} bytes; declarado ${e.size} bytes. Posible tamaño falsificado.`);
         for (const b of chunk) crc = crcTable[(crc ^ b) & 255] ^ (crc >>> 8);
         if (scan && e.size <= cap.text) text += decoder.decode(chunk, { stream: true });
       };
@@ -72,7 +88,7 @@
       else {
         const stream = new flate.Inflate(accept);
         if (!e.packed) fail('Flujo comprimido vacío.');
-        for (let p=0;p<e.packed;p+=1024) stream.push(bytes.subarray(e.data+p, e.data+Math.min(e.packed,p+1024)), p+1024>=e.packed);
+        for (let p=0;p<e.packed;p+=1024) { checkTime(); stream.push(bytes.subarray(e.data+p, e.data+Math.min(e.packed,p+1024)), p+1024>=e.packed); }
       }
       if (actual !== e.size || ((crc ^ 0xffffffff) >>> 0) !== e.crc) fail('Archivo corrupto: tamaño o CRC incorrecto.');
       if (scan && e.size > cap.text) report.warnings.push('Contenido omitido por límite de texto: '+e.name);
@@ -93,8 +109,9 @@
     report.modules = [...new Set([...(report.counts.html ? ['Páginas y maquetación'] : []), ...(report.counts.forms ? ['Formularios'] : []), ...report.findings.filter(f => f.confidence === 'indicio').map(f => f.technology)])];
     report.warnings.push('Análisis estático: los patrones pueden aparecer en comentarios o código sin uso. No verifica funcionamiento, seguridad, rutas dinámicas ni servicios. No se abren ZIP anidados. Dependencias declaradas no equivalen a instaladas.');
     report.durationMs = Date.now()-begun;
+    checkTime();
     return report;
   }
-  root.LXLZip = { limits, inspectDirectory, analyze };
+  root.LXLZip = { limits, inspectDirectory, analyze, checkLimit };
   if (typeof module !== 'undefined') module.exports = root.LXLZip;
 })(globalThis);
