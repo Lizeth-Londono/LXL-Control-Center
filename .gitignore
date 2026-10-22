@@ -16,3 +16,4 @@ update-v31.cjs
 .qa/
 playwright-report/
 test-results/
+/output/

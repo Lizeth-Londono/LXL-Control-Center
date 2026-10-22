@@ -30,7 +30,7 @@ const server=http.createServer((req,res)=>{
     const page=await browser.newPage({acceptDownloads:true});const errors=[],external=[];
     page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith('http://127.0.0.1:4175/'))external.push(r.url());});
     await page.goto('http://127.0.0.1:4175/admin/#zip');
-    assert.match(await page.locator('.footer').textContent(),/Panel DEMO v3\.2\.1/);
+    assert.match(await page.locator('.footer').textContent(),/Panel DEMO v3\.(?:2\.1|3)/);
     assert.match(await page.locator('.footer').textContent(),/Sin autenticación/);
     let oldIndividualLimitVerified=false;
     if(isOriginal) {
