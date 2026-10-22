@@ -1,0 +1,9 @@
+# Publish application assets only; QA fixtures and review documents stay out of Pages.
+exclude:
+  - tests
+  - COMMERCIAL-v3.3.md
+  - QA-UX01-v3.3.md
+  - QA-RELEASE-v3.3.md
+  - VALIDACION-ZIP-v3.2.1.md
+  - VALIDACION-ZIP-v3.2.md
+  - ZIP-OPERATIVO.md
