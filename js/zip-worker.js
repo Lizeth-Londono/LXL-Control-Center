@@ -3,7 +3,7 @@ importScripts('vendor/fflate.js', 'zip-core.js');
 self.onmessage = async ({ data }) => {
   try {
     const { file, limits } = data;
-    if (file.size > limits.compressed) throw new Error('El ZIP supera el límite comprimido configurado.');
+    LXLZip.checkLimit('Tamaño comprimido del ZIP', file.size, limits.compressed);
     const report = await LXLZip.analyze(new Uint8Array(await file.arrayBuffer()), limits, fflate,
       progress => self.postMessage({ type: 'progress', progress }));
     self.postMessage({ type: 'complete', report });

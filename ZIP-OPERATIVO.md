@@ -1,4 +1,6 @@
-# ZIP operativo v3.2
+# ZIP operativo v3.2.1
+
+Corrección del rechazo del ZIP original, causa raíz y pruebas: [VALIDACION-ZIP-v3.2.1.md](VALIDACION-ZIP-v3.2.1.md). Los resultados v3.2 siguientes son históricos.
 
 Validación final, correcciones del motor y pendiente de ZIP real superior a 15 MB: [VALIDACION-ZIP-v3.2.md](VALIDACION-ZIP-v3.2.md).
 
@@ -8,7 +10,7 @@ Se sirve con el mismo servidor estático del sitio, por HTTP/HTTPS. No funciona 
 
 Sin información de memoria: 64 MiB comprimidos, 128 MiB descomprimidos. Con `navigator.deviceMemory`: presupuesto comprimido de `min(256, GiB informados × 32)` MiB; el total descomprimido es el doble. Esta API informa memoria aproximada del equipo, no memoria libre. No hay una API portátil de memoria disponible. Los presupuestos son conservadores, no garantías contra falta de memoria del dispositivo.
 
-Máximos: 5000 entradas, 8 MiB por entrada, 30 segundos desde iniciar el Worker (incluida lectura), expansión individual 200:1, profundidad 24, rutas 512 caracteres. El usuario puede reducir los primeros cinco límites desde la tarjeta. Hasta 2 MiB de texto por entrada; archivos mayores se validan y enumeran pero se advierte que su contenido no se inspeccionó. Hasta 500 evidencias tecnológicas; las cuentas y estructura sí abarcan todas las entradas aceptadas. Se carga el ZIP comprimido en el Worker y se descomprime una entrada por vez, en bloques comprimidos de 1024 bytes. Solo se retiene texto de la entrada actual. El Worker se termina ante cancelación, límite de tiempo, error o finalización.
+Máximos vigentes: 5000 entradas, hasta 32 MiB por entrada (o la mitad del presupuesto comprimido si es menor), 30 segundos desde iniciar el Worker (incluida lectura), profundidad 24, rutas 512 caracteres. Una relación individual superior a 200:1 genera una advertencia; no rechaza por sí sola. Siguen siendo obligatorios los límites descomprimidos individuales y totales, tanto declarados como reales. Los errores de presupuesto identifican la condición, el valor detectado y el límite aplicado sin rutas ni contenido. El usuario puede reducir los límites de tamaño, entradas y tiempo desde la tarjeta. Hasta 2 MiB de texto por entrada; archivos mayores se validan y enumeran pero se advierte que su contenido no se inspeccionó. Hasta 500 evidencias tecnológicas; las cuentas y estructura sí abarcan todas las entradas aceptadas. Se carga el ZIP comprimido en el Worker y se descomprime una entrada por vez, en bloques comprimidos de 1024 bytes. Solo se retiene texto de la entrada actual. El Worker se termina ante cancelación, límite de tiempo, error o finalización. El plazo también se comprueba en cada bloque durante la descompresión.
 
 ## Seguridad y alcance
 
@@ -22,7 +24,7 @@ El repositorio identifica expresamente los precios públicos como ilustrativos y
 
 ## Verificación
 
-`node --test --test-force-exit tests/zip.test.cjs`: ocho pruebas del motor con fixtures sintéticos en memoria: pequeño, 1000 entradas, 20 MiB sin compresión, Deflate, ZIP vacío, corruptos, CRC, traversal, duplicados, profundidad, cifrado, métodos no admitidos, ZIP64, expansión maliciosa y tamaños falseados; límites de tamaño, entradas y tiempo. El UMD de fflate mantiene recursos Node: `--test-force-exit` cierra el proceso al terminar las pruebas.
+`node --test --test-force-exit tests/zip.test.cjs`: doce pruebas del motor con fixtures sintéticos en memoria: pequeño, 1000 entradas, 20 MiB sin compresión, Deflate, ZIP vacío, corruptos, CRC, traversal, duplicados, profundidad, cifrado, métodos no admitidos, ZIP64, expansión maliciosa y tamaños falseados; límites de tamaño, entradas y tiempo; compresión elevada dentro del presupuesto; archivos válidos mayores de 8 MiB y mensajes específicos de límites. El UMD de fflate mantiene recursos Node: `--test-force-exit` cierra el proceso al terminar las pruebas.
 
 `node tests/zip-browser.cjs`: requiere Playwright instalado en `.qa` y Chrome (ruta configurable con `CHROME_PATH`). Verifica Worker real, texto hostil sin interpretación, reporte, borrador, descarga, corrupción, cancelación, tiempo máximo, descarte, anchos 320/768/1440, navegación administrativa, fórmulas públicas y ausencia de solicitudes externas.
 

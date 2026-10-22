@@ -6,7 +6,7 @@
   const fields = [['compressed','ZIP comprimido (MiB)',1048576], ['expanded','Total descomprimido (MiB)',1048576], ['entry','Por archivo (MiB)',1048576], ['entries','Máximo de entradas',1], ['seconds','Tiempo máximo (segundos)',1]];
   for (const [key,label,unit] of fields) {
     const wrapper = document.createElement('label'); wrapper.className='field'; wrapper.textContent=label;
-    const input=document.createElement('input'); input.type='number'; input.min='1'; input.max=defaults[key]/unit; input.value=defaults[key]/unit; input.id='zip-limit-'+key;
+    const input=document.createElement('input'); input.type='number'; input.required=true; input.min='1'; input.max=defaults[key]/unit; input.value=defaults[key]/unit; input.id='zip-limit-'+key;
     wrapper.append(input); $('zip-limits').append(wrapper);
   }
   $('zip-memory').textContent = navigator.deviceMemory ? `Memoria aproximada informada por el navegador: ${navigator.deviceMemory} GiB. No representa memoria libre.` : 'El navegador no informa memoria: se usa un presupuesto conservador de 64 MiB comprimidos.';
@@ -30,11 +30,12 @@
     const cap={...defaults};
     for(const [key,,unit] of fields) { const input=$('zip-limit-'+key); if(!input.reportValidity()) return; cap[key]=Number(input.value)*unit; }
     if(!/\.zip$/i.test(file.name)) { status('Selecciona un archivo con extensión .zip.'); return; }
-    if(file.size>cap.compressed) { status('El archivo supera el límite comprimido configurado. Divide el proyecto.'); return; }
+    try { LXLZip.checkLimit('Tamaño comprimido del ZIP', file.size, cap.compressed); } catch(error) { status(error.message); return; }
     if(!window.Worker) { status('Este navegador no admite Workers. Usa un navegador moderno desde un servidor local.'); return; }
     try {
       worker=new Worker('../js/zip-worker.js'); $('zip-analyze').disabled=true; $('zipfile').disabled=true; $('zip-cancel').disabled=false; $('zip-progress').hidden=false; $('zip-progress').removeAttribute('value'); status('Validando estructura y analizando localmente…');
-      timer=setTimeout(()=>{stop(); clear(); status('Tiempo máximo alcanzado. Se detuvo el análisis; divide el proyecto.');},cap.seconds*1000);
+      const deadline=performance.now();
+      timer=setTimeout(()=>{const elapsed=Math.round(performance.now()-deadline);stop(); clear(); status(`Tiempo máximo alcanzado: detectado ${elapsed} ms; límite aplicado ${cap.seconds*1000} ms. Se detuvo el análisis; divide el proyecto.`);},cap.seconds*1000);
       const activeWorker=worker;
       worker.onmessage=({data})=>{
         if(worker!==activeWorker)return;
