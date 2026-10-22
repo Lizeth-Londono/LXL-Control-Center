@@ -12,7 +12,8 @@ Sirve la raíz por HTTP y abre `/admin/#commercial`. Durante la revisión está 
 4. Añade servicios, describe el trabajo, indica cantidades y adicionales. La selección copia la tarifa; quitarla del catálogo no cambia importes ya seleccionados. Editar un unitario lo devuelve a pendiente; para aprobarlo, registra la tarifa y sustituye el concepto.
 5. Completa emisor, cliente, proyecto, referencia, fechas, condiciones, alcance y exclusiones. Configura expresamente impuestos o su no aplicación. Un descuento requiere referencia y confirmación de autorización. No se sugieren datos tributarios.
 6. Previsualiza o descarga el PDF. Precios pendientes/ilustrativos, datos incompletos, impuestos pendientes o estado borrador producen BORRADOR en todas las páginas. Ediciones invalidan el PDF anterior y devuelven el estado a borrador. «Enviada» solo es un estado local; no envía nada.
-7. Descartar elimina informe, cliente, catálogo, líneas y URLs de PDF de la sesión. Cerrar/recargar elimina la sesión; no existe recuperación automática. Una importación inválida no reemplaza una sesión válida.
+7. El selector y arrastrar/soltar comparten el informe activo. El candidato no cambia su nombre visible hasta validarse y confirmarse el reemplazo. Error, límite, cancelación o rechazo de confirmación conservan íntegramente el informe y la cotización anteriores; sin sesión previa permanecen vacíos. Un reemplazo aceptado elimina cliente, catálogo, conceptos, condiciones y PDF anteriores. El nombre inicial del proyecto procede del nombre del JSON y debe revisarse.
+8. «Nueva cotización para este proyecto» identifica el proyecto y el informe activos y pide confirmar el descarte de la cotización. Conserva ese informe, el nombre del proyecto y su catálogo; reinicia cliente, conceptos, condiciones, impuestos, descuento y estado borrador. Para cambiar de proyecto importa otro informe. Descartar sesión elimina también informe y catálogo; cerrar/recargar elimina la sesión sin recuperación automática.
 
 ## Arquitectura y seguridad
 
@@ -63,6 +64,7 @@ Comandos desde la raíz:
 
 ```
 node --test tests/commercial.test.cjs
+node tests/commercial-import-browser.cjs
 node tests/commercial-browser.cjs "RUTA_AL_ZIP_REAL_AUTORIZADO"
 node --test --test-force-exit tests/zip.test.cjs
 node tests/zip-audit.cjs
@@ -71,6 +73,8 @@ node tests/zip-final.cjs "RUTA_AL_ZIP_REAL_AUTORIZADO" 289
 ```
 
 Playwright se requiere en `.qa/node_modules`; el render de PDF usa PDF.js en `.qa/pdfjs/package`. La regresión existente se ejecuta con `.qa/check-v32.cjs`. El núcleo comercial no requiere dependencias para sus pruebas.
+
+UX-01 y repetición de QA documentados en [QA-UX01-v3.3.md](QA-UX01-v3.3.md). Si el navegador no admite reasignar `input.files` mediante DataTransfer, el selector queda vacío y la etiqueta «Informe activo» sigue siendo la referencia; nunca se muestra el candidato fallido como informe confirmado. Esta alternativa no sustituye la validación pendiente en Safari/Firefox.
 
 ## Límites y publicación
 
