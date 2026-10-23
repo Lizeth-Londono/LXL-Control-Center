@@ -2,6 +2,7 @@
 exclude:
   - tests
   - COMMERCIAL-v3.3.md
+  - COMMERCIAL-v3.3.1.md
   - QA-UX01-v3.3.md
   - QA-RELEASE-v3.3.md
   - VALIDACION-ZIP-v3.2.1.md

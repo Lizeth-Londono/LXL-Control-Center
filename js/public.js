@@ -20,7 +20,8 @@ addEventListener('hashchange',()=>navigate(location.hash||'#inicio',false));
 const observer=new IntersectionObserver(spy,{rootMargin:'-18% 0px -65% 0px',threshold:0});targets.forEach(t=>observer.observe(t));addEventListener('scroll',spy,{passive:true});addEventListener('resize',positionIndicator);addEventListener('popstate',()=>{if(location.hash&&document.getElementById(location.hash.slice(1)))navigate(location.hash,false);else navigate('#inicio',false)});addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
 requestAnimationFrame(()=>{if(location.hash&&document.getElementById(location.hash.slice(1)))navigate(location.hash,false);else active('inicio')});
 const money=n=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n);
-function estimate(){const total=($('base').checked?60000:0)+($('section').checked?15000:0)+($('filter').checked?40000:0);$('total').textContent=money(total);return total}
+document.querySelectorAll('[data-rate-price]').forEach(el=>{const rate=LXLRates.services.find(r=>r.id===el.dataset.ratePrice);el.textContent='$'+new Intl.NumberFormat('es-CO').format(rate.price/100);});
+function estimate(){const total=LXLRates.estimate(LXLRates.services.filter(s=>$(s.id).checked).map(s=>s.id));$('total').textContent=money(total);return total}
 ['base','section','filter'].forEach(id=>$(id).addEventListener('change',estimate));estimate();
 function invalidateSummary(){lastSummary='';$('copy-request').disabled=true;$('request-result').textContent='La selección cambió. Prepara nuevamente el resumen.'}
 ['base','section','filter','name','contact','details'].forEach(id=>$(id).addEventListener('input',invalidateSummary));

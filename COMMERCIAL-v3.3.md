@@ -1,5 +1,7 @@
 # Flujo comercial local v3.3
 
+Documento histórico de v3.3. La automatización, referencias compartidas y abonos en revisión se describen en [v3.3.1](COMMERCIAL-v3.3.1.md).
+
 Rama `feat/commercial-workflow-v3.3`, basada en `main` estable v3.2.1 (`9c8fb23`). Sin merge, push ni despliegue. El cotizador público y el motor ZIP se conservan sin cambios. El panel continúa DEMO: sin autenticación, persistencia o envío de documentos.
 
 ## Uso y previsualización
